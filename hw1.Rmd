@@ -244,6 +244,22 @@ ggplot(pca_scores, aes(x = PC1, y = PC2, color = Country)) +
 
 ```
 
+It looks like there are outliers in the dataset. Maybe removing them would help?
+
+```{r}
+pca_scores %>%
+  filter(PC1 > -500) %>%
+  filter(PC2 < 200) %>%
+# Plot the PCA results with ggplot2, coloring by country
+ggplot(aes(x = PC1, y = PC2, color = Country)) +
+  geom_point() +
+  labs(title = "PCA of Customer Purchases", x = "Principal Component 1", y = "Principal Component 2") +
+  theme_minimal() +
+  theme(legend.position = "right")
+
+
+```
+
 From the PCA plot, it looks like there are no clear patterns in the data. This suggests that consumers from different countries are not interested in different products.
 
 
