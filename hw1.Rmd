@@ -117,7 +117,13 @@ dataset %>%
   group_by(Country) %>%
   summarise(NoOfTransactions = n()) %>%
   arrange(desc(NoOfTransactions)) %>%
-  head(10)
+  head(10) %>%
+  ggplot(aes(x = reorder(Country, NoOfTransactions), y = NoOfTransactions)) +
+  geom_bar(stat = "identity", fill = "purple") +
+  labs(x = "Country",
+       y = "No. of Transactions",
+       title = "Number of Transactions by Country") +
+  coord_flip()
 
 ```
 
@@ -141,6 +147,39 @@ dataset %>%
 
 ```
 From these plots, it is clear that different products are popular in different countries.
+
+What did sales look like in these three countries over time?
+Both in terms of number of units and total revenue
+
+```{r}
+
+library(lubridate)
+# Data Preparation: Aggregate sales and number of units over time
+sales_data <- dataset %>%
+  filter(Country %in% c("United Kingdom", "Germany", "France")) %>%
+  mutate(Week = floor_date(InvoiceDate, "week")) %>%
+  group_by(Week, Country) %>%
+  summarise(TotalSales = sum(Quantity * UnitPrice, na.rm = TRUE),
+            TotalUnits = sum(Quantity, na.rm = TRUE),
+            .groups = "drop")
+
+# Plotting the data
+ggplot(sales_data, aes(x = Week)) +
+  geom_line(aes(y = TotalSales, color = "sales"), alpha = 0.7) + # Line plot for Total Sales
+  geom_line(aes(y = TotalUnits, color = "units"), alpha = 0.7) + # Points for Total Units
+  facet_wrap(~ Country, scales = "free_y") + # Facet by country
+  labs(title = "Weekly Sales Trends and Number of Units sold by Country",
+       x = "Week",
+       y = "Sales / Units"
+       ) +
+  theme_minimal() +
+  theme(legend.position = "bottom")
+
+
+```
+
+Here, I spent a bunch of time tweaking the visualization to play around with trying to visualize both sales and units together. I think reducing the alpha from 1 made it easier to not get confused when the lines overlapped. I also used a facet grid to separate the data by country, since the data is nominal. I also used position to represent the two metrics, since they are numeric. I think this visualization is effective because it allows us to see how sales and units sold have changed over time in the three countries. It also allows us to compare the trends in the three countries side by side.
+The choice to free the y scales was because otherwise the UK graph would have skewed the axes completely. This way, we can see the trends in the other two countries more clearly.
 
 ### What are the Customers in different countries like?
 
@@ -212,11 +251,14 @@ We can create a matrix of consumers and the products they purchased and use PCA 
 
 ```{r}
 
-# Summarize data to have one row per customer with their product quantities
+# Summarize data to have one row per customer with their product quantities as a fraction of total purchases in that country
 pca_data <- dataset %>%
   filter(Country %in% c("United Kingdom", "Germany", "France")) %>%
   group_by(CustomerID, Country, Description) %>%
   summarise(TotalQuantity = sum(Quantity), .groups = "drop") %>%
+  #group_by(Country) %>%
+  #mutate(Fraction = TotalQuantity / sum(TotalQuantity)) %>%
+  #ungroup() %>%
   pivot_wider(names_from = Description, values_from = TotalQuantity, values_fill = 0) 
 
 # Remove constant or zero-variance columns
@@ -245,13 +287,16 @@ ggplot(pca_scores, aes(x = PC1, y = PC2, color = Country)) +
 ```
 
 It looks like there are outliers in the dataset. Maybe removing them would help?
+For the below plot, I played around with setting alpha and finally decided to set it to 0.2 for the UK data points. This way, the UK data points are still visible, but the other data points are not completely obscured by the massive number of UK data points.
+I look forward to receiving feedback on this particular point, since I actually wasn't quite sure what the best "visualization practice" would be.
 
 ```{r}
 pca_scores %>%
-  filter(PC1 > -500) %>%
-  filter(PC2 < 200) %>%
+  filter(PC1 > -20) %>%
+  filter(PC2 < 10) %>%
+  mutate(transparency = if_else(Country == "United Kingdom", 0.2, 1)) %>%
 # Plot the PCA results with ggplot2, coloring by country
-ggplot(aes(x = PC1, y = PC2, color = Country)) +
+ggplot(aes(x = PC1, y = PC2, color = Country, alpha = transparency)) +
   geom_point() +
   labs(title = "PCA of Customer Purchases", x = "Principal Component 1", y = "Principal Component 2") +
   theme_minimal() +
@@ -267,5 +312,5 @@ From the PCA plot, it looks like there are no clear patterns in the data. This s
 
 In this assignment, we used the Customer Segmentation dataset from Kaggle to answer some basic questions about the data. We found that different products were popular in different countries, and that the average spend and number of products bought by consumers was roughly the same across countries. We also found that the underlying distributions of revenue generated and units purchased were similar across countries. Finally, we found that consumers from different countries could not really be clustered on the basis of which products they bought.
 
-Overall, this dataset provides a lot of interesting insights into consumer behavior, and could be used to drive business decisions in the future.
+Overall, this dataset provides a lot of interesting insights into consumer behavior, and could be used to drive business decisions and strategies in different countries in the future.
 
